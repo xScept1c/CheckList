@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TakeTheTime</title>
+    <meta charset="UTF-8">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; border-radius: 15px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        h1 { color: #333; margin-bottom: 20px; text-align: center; }
+        .search-box { margin-bottom: 20px; }
+        .search-box input { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; }
+        .filter-buttons { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        .filter-btn { background: #e0e0e0; color: #333; }
+        .filter-btn.active { background: #667eea; color: white; }
+        .sort-buttons { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        button { padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; transition: 0.3s; }
+        button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        .stats { background: #f0f0f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-weight: bold; }
+        .add-form { margin-bottom: 30px; padding: 20px; background: #f9f9f9; border-radius: 10px; }
+        .add-form input, .add-form textarea { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; }
+        .add-form textarea { min-height: 80px; resize: vertical; }
+        .task { background: white; border: 1px solid #e0e0e0; border-radius: 10px; padding: 15px; margin-bottom: 10px; transition: 0.3s; }
+        .task:hover { box-shadow: 0 5px 15px rgba(0,0,0,0.1); transform: translateX(5px); }
+        .task.completed { background: #e8f5e9; opacity: 0.8; }
+        .task-header { display: flex; align-items: center; margin-bottom: 5px; }
+        .status-btn { font-size: 24px; cursor: pointer; margin-right: 10px; transition: 0.2s; }
+        .status-btn:hover { transform: scale(1.1); }
+        .task-title { flex: 1; font-weight: bold; font-size: 16px; }
+        .task.completed .task-title { text-decoration: line-through; color: #666; }
+        .task-actions { margin-left: 10px; }
+        .task-actions span { margin-left: 10px; cursor: pointer; font-size: 18px; }
+        .task-desc { margin-top: 8px; padding-left: 34px; color: #666; font-size: 14px; }
+        .delete-btn { color: #f44336; }
+        .edit-btn { color: #2196F3; }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 30px;
+            border-radius: 15px;
+            width: 500px;
+            max-width: 90%;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        }
+        .modal-content input, .modal-content textarea, .modal-content select {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .modal-content textarea { min-height: 100px; resize: vertical; }
+        .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
+        .modal-buttons button { flex: 1; }
+        .cancel-btn { background: #999; }
+        .save-btn { background: #4CAF50; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📝 TakeTheTime</h1>
+    
+    <div class="search-box">
+        <input type="text" id="search" placeholder="🔍 Поиск по ID, названию или статусу" onkeyup="filterTasks()">
+    </div>
+    
+    <div class="filter-buttons">
+        <button class="filter-btn" id="filterAll" onclick="setFilter('all')">📋 Все задачи</button>
+        <button class="filter-btn" id="filterActive" onclick="setFilter('active')">⏳ Активные</button>
+        <button class="filter-btn" id="filterCompleted" onclick="setFilter('completed')">✅ Выполненные</button>
+    </div>
+    
+    <div class="sort-buttons">
+        <button onclick="sortTasks('id')">📊 По ID</button>
+        <button onclick="sortTasks('title')">🔤 По названию</button>
+        <button onclick="sortTasks('status')">✓ По статусу</button>
+    </div>
+    
+    <div class="stats" id="stats"></div>
+    
+    <div class="add-form">
+        <input type="text" id="newTitle" placeholder="Название задачи *">
+        <textarea id="newDesc" placeholder="Описание задачи (необязательно)"></textarea>
+        <button onclick="addTask()" style="width: 100%;">➕ Добавить задачу</button>
+    </div>
+    
+    <div id="tasks"></div>
+</div>
+
+<div id="editModal" class="modal">
+    <div class="modal-content">
+        <h3>✏️ Редактировать задачу</h3>
+        <input type="text" id="editId" readonly style="background:#f0f0f0">
+        <input type="text" id="editTitle" placeholder="Название задачи">
+        <textarea id="editDesc" placeholder="Описание задачи"></textarea>
+        <select id="editStatus">
+            <option value="pending">⏳ В работе</option>
+            <option value="completed">✅ Выполнено</option>
+        </select>
+        <div class="modal-buttons">
+            <button class="cancel-btn" onclick="closeModal()">Отмена</button>
+            <button class="save-btn" onclick="saveEdit()">Сохранить</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let tasks = [], sortType = 'id', searchText = '';
+    let statusFilter = 'all'; 
+    let editingId = null;
+    
+    function loadTasks() {
+        fetch('/api/tasks').then(res => res.json()).then(data => { tasks = data; renderTasks(); });
+    }
+    
+    function renderTasks() {
+        let filtered = tasks.filter(t => {
+            
+            let matchesSearch = searchText === '' || 
+                t.id.toString().includes(searchText) || 
+                t.title.toLowerCase().includes(searchText.toLowerCase()) ||
+                (searchText.toLowerCase() === 'active' && t.status === 'pending') ||
+                (searchText.toLowerCase() === 'completed' && t.status === 'completed') ||
+                (searchText.toLowerCase() === 'pending' && t.status === 'pending');
+            
+       
+            let matchesFilter = true;
+            if (statusFilter === 'active') matchesFilter = t.status === 'pending';
+            if (statusFilter === 'completed') matchesFilter = t.status === 'completed';
+            
+            return matchesSearch && matchesFilter;
+        });
+        
+      
+        filtered.sort((a,b) => { 
+            if(sortType=='id') return a.id-b.id; 
+            if(sortType=='title') return a.title.localeCompare(b.title); 
+            return a.status.localeCompare(b.status); 
+        });
+        
+   
+        let pending = tasks.filter(t=>t.status==='pending').length;
+        let completed = tasks.filter(t=>t.status==='completed').length;
+        document.getElementById('stats').innerHTML = '📊 Всего: '+tasks.length+' | ⏳ Активных: '+pending+' | ✅ Выполнено: '+completed;
+        
+      
+        document.getElementById('tasks').innerHTML = filtered.map(task => `
+            <div class="task ${task.status}">
+                <div class="task-header">
+                    <span class="status-btn" onclick="toggleTask(${task.id})">${task.status==='pending'?'◻️':'✅'}</span>
+                    <span class="task-title">#${task.id}: ${task.title}</span>
+                    <div class="task-actions">
+                        <span class="edit-btn" onclick="openEditModal(${task.id})">✏️</span>
+                        <span class="delete-btn" onclick="deleteTask(${task.id})">🗑️</span>
+                    </div>
+                </div>
+                ${task.description ? '<div class="task-desc">📝 '+task.description+'</div>' : ''}
+            </div>
+        `).join('');
+        
+        if(filtered.length === 0) {
+            document.getElementById('tasks').innerHTML = '<div style="text-align:center; padding:40px; color:#999;">📭 Задачи не найдены</div>';
+        }
+    }
+    
+    function setFilter(filter) {
+        statusFilter = filter;
+      
+        document.getElementById('filterAll').classList.remove('active');
+        document.getElementById('filterActive').classList.remove('active');
+        document.getElementById('filterCompleted').classList.remove('active');
+        if(filter === 'all') document.getElementById('filterAll').classList.add('active');
+        if(filter === 'active') document.getElementById('filterActive').classList.add('active');
+        if(filter === 'completed') document.getElementById('filterCompleted').classList.add('active');
+        renderTasks();
+    }
+    
+    function addTask() {
+        let title = document.getElementById('newTitle').value;
+        if(!title) { alert('Введите название!'); return; }
+        fetch('/api/add', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:title,description:document.getElementById('newDesc').value})})
+            .then(()=>{ document.getElementById('newTitle').value=''; document.getElementById('newDesc').value=''; loadTasks(); });
+    }
+    
+    function deleteTask(id) { 
+        if(confirm('Удалить задачу #'+id+'?')) 
+            fetch('/api/delete/'+id,{method:'DELETE'}).then(()=>loadTasks()); 
+    }
+    
+    function toggleTask(id) { 
+        fetch('/api/toggle/'+id,{method:'POST'}).then(()=>loadTasks()); 
+    }
+    
+    function openEditModal(id) {
+        let task = tasks.find(t=>t.id===id);
+        if(!task) return;
+        editingId = id;
+        document.getElementById('editId').value = '# ' + id + ': ' + task.title;
+        document.getElementById('editTitle').value = task.title;
+        document.getElementById('editDesc').value = task.description || '';
+        document.getElementById('editStatus').value = task.status;
+        document.getElementById('editModal').style.display = 'block';
+    }
+    
+    function closeModal() {
+        document.getElementById('editModal').style.display = 'none';
+        editingId = null;
+    }
+    
+    function saveEdit() {
+        let newTitle = document.getElementById('editTitle').value;
+        if(!newTitle) { alert('Название не может быть пустым!'); return; }
+        
+        let updatedTask = {
+            title: newTitle,
+            description: document.getElementById('editDesc').value,
+            status: document.getElementById('editStatus').value
+        };
+        
+        fetch('/api/update/' + editingId, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(updatedTask)
+        }).then(() => {
+            closeModal();
+            loadTasks();
+        });
+    }
+    
+    function sortTasks(type) { sortType=type; renderTasks(); }
+    function filterTasks() { searchText=document.getElementById('search').value; renderTasks(); }
+    
+    window.onclick = function(event) {
+        let modal = document.getElementById('editModal');
+        if (event.target == modal) closeModal();
+    }
+    
+   
+    document.getElementById('filterAll').classList.add('active');
+    
+    loadTasks();
+</script>
+</body>
+</html>
